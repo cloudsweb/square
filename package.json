@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "createdb": "pg_ctl -D data init",
+    "startdb": "pg_ctl -D data -o '-p7039' -l postgres.log start",
+    "stop": "pg_ctl -D data stop",
+    "diesel": "diesel --database-url postgres://localhost:7039/posts"
+  }
+}
