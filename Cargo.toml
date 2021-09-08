@@ -1,0 +1,4 @@
+# cargo install --no-default-features --features postgres --git https://github.com/diesel-rs/diesel diesel_cli
+
+[workspace]
+members = [ 'server' ]

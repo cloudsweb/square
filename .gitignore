@@ -1,4 +1,8 @@
 /data
+/target
 node_modules
+
 yarn.lock
 postgres.log
+Cargo.lock
+*.bak

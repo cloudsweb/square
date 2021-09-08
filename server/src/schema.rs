@@ -1,4 +1,6 @@
-table! {
+// @generated automatically by Diesel CLI.
+
+diesel::table! {
     posts (id) {
         topic_id -> Int8,
         id -> Uuid,
@@ -13,10 +15,11 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     users (id) {
         id -> Int8,
         name -> Text,
+        alias -> Text,
         description -> Nullable<Text>,
         avatar -> Nullable<Text>,
         inserted_at -> Timestamp,
@@ -24,7 +27,7 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     posts,
     users,
 );

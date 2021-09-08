@@ -1,6 +1,7 @@
 CREATE TABLE users (
   id BIGINT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,
+  alias TEXT NOT NULL UNIQUE,
   description TEXT,
   avatar TEXT,
   inserted_at TIMESTAMP NOT NULL,
