@@ -7,7 +7,7 @@ use diesel::prelude::*;
 mod schema;
 mod db;
 
-const DATABASE_URL: &'static str = "postgres://localhost:7039/posts";
+const DATABASE_URL: &'static str = "postgresql://localhost:7039/posts";
 
 fn main() {
   flexi_logger::Logger::try_with_env_or_str("info").unwrap().start().unwrap();
