@@ -7,7 +7,7 @@ mod db;
 mod rest;
 
 const DATABASE_URL: &'static str = "postgresql://localhost:7039/posts";
-const WEB_URL: &'static str = "localhost:7080";
+const WEB_URL: &'static str = "localhost:7079";
 
 fn main() {
   flexi_logger::Logger::try_with_env_or_str("info").unwrap().start().unwrap();

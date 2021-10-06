@@ -3,6 +3,7 @@
 node_modules
 
 yarn.lock
+yarn-error.log
 postgres.log
 Cargo.lock
 *.bak
