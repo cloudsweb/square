@@ -9,5 +9,7 @@ edition = "2018"
 [dependencies]
 log = "*"
 flexi_logger = "*"
-diesel = { git="https://github.com/diesel-rs/diesel", features=["postgres", "uuid"] }
+diesel = { git="https://github.com/diesel-rs/diesel", features=["postgres", "uuid", "r2d2"] }
 uuid = "*"
+actix-web = "4.0.0-beta.9"
+anyhow = "*"
