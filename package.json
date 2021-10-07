@@ -3,6 +3,7 @@
     "createdb": "pg_ctl -D data init",
     "startdb": "pg_ctl -D data -o '-p7039' -l postgres.log start",
     "stop": "pg_ctl -D data stop",
-    "diesel": "diesel --database-url postgresql://localhost:7039/posts"
+    "diesel": "diesel --database-url postgresql://localhost:7039/posts",
+    "web": "yarn --cwd pages"
   }
 }
