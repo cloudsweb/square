@@ -11,6 +11,7 @@
 
 <script lang="ts">
 import { defineComponent, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 
 class UserCreate {
   alias?: string
@@ -23,10 +24,26 @@ class UserCreate {
 export default defineComponent({
   setup() {
     const user = reactive(new UserCreate())
+    const router = useRouter()
     const submit = () => {
       console.log(user)
       // 1. check
       // 2. submit
+      fetch('/api/users/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(user),
+      }).then(() => {
+        // TODO: check user.alias
+        if (user.alias != null && user.alias != '') {
+          router.push(`/${user.alias}`)
+        }
+        // jump to ...
+      }).catch(() => {
+        // show error
+      })
     }
     return { user, submit }
   },

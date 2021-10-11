@@ -1,19 +1,30 @@
 use std::ops::DerefMut;
 
 use crate::{db, db::Pool};
-use actix_web::{get, post, web, App, HttpServer, Responder};
+use actix_web::{App, HttpServer, Responder, get, http::StatusCode, post, web};
+
+#[derive(Debug, serde::Deserialize)]
+pub struct UserCreateInfo {
+  pub alias: String,
+  pub name: String,
+  pub password: String,
+  pub email: Option<String>,
+  pub description: Option<String>,
+  pub avatar: Option<String>, // TODO: upload?
+}
 
 #[post("/users/create")]
-async fn create_user(conn: web::Data<Pool>) -> impl Responder {
+async fn create_user(conn: web::Data<Pool>, info: web::Json<UserCreateInfo>) -> impl Responder {
   let mut conn = conn.get().expect("database error");
+  println!("create_user {:?}", info);
   let result = db::UserCreate {
-    alias: "test".to_string(), name: "test name".to_string(), 
-    description: None,
-    avatar: None,
+    alias: info.alias.clone(), name: info.name.clone(), 
+    description: info.description.clone(),
+    avatar: info.avatar.clone(),
   }.exec(conn.deref_mut());
   match result {
-    Ok(()) => "succeed".to_string(),
-    Err(e) => format!("error: {:?}", e),
+    Ok(()) => ("succeed".to_string(), StatusCode::OK),
+    Err(e) => (format!("error: {:?}", e), StatusCode::BAD_REQUEST), // TODO: 400 bad requests
   }
 }
 
