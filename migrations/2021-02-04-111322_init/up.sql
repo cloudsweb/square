@@ -11,6 +11,7 @@ CREATE TABLE users (
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+SELECT diesel_manage_updated_at('users');
 
 CREATE TABLE secrets (
   id BIGINT NOT NULL PRIMARY KEY REFERENCES users (id),
@@ -19,6 +20,12 @@ CREATE TABLE secrets (
   updated_ip TEXT,
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+SELECT diesel_manage_updated_at('secrets');
+
+-- CREATE FUNCTION new_password(user_id BIGINT, password TEXT) RETURNS TEXT AS $$ BEGIN
+--   SELECT CONCAT(current, password) FROM secrets WHERE id == user_id;
+-- END; $$ LANGUAGE plpgsql;
+
 
 CREATE TABLE posts (
   topic_id BIGINT NOT NULL,
@@ -32,3 +39,4 @@ CREATE TABLE posts (
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+SELECT diesel_manage_updated_at('posts');
