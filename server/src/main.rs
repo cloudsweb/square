@@ -4,6 +4,7 @@
 // use diesel::prelude::*;
 mod schema;
 mod db;
+mod auth;
 mod rest;
 
 const DATABASE_URL: &'static str = "postgresql://localhost:7039/posts";
