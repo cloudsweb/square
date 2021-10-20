@@ -2,7 +2,7 @@
   <n-space vertical>
     <n-input v-model:value="user.alias" type="text" placeholder="Username" />
     <n-input v-model:value="user.name" type="text" placeholder="Nickname" />
-    <n-input v-model:value="user.password" type="text" placeholder="Password" />
+    <n-input v-model:value="user.password" type="password" placeholder="Password" />
     <n-input v-model:value="user.email" type="text" placeholder="Email" />
     <n-input v-model:value="user.desc" type="textarea" placeholder="Basic Textarea" />
     <n-button @click="submit">Submit</n-button>
