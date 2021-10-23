@@ -9,13 +9,15 @@ edition = "2018"
 [dependencies]
 log = "*"
 flexi_logger = "*"
+async-trait = "*"
+anyhow = "*"
 rand = "*"
 uuid = "*"
 sha2 = "*"
 diesel = { git="https://github.com/diesel-rs/diesel", features=["postgres", "uuid", "r2d2"] }
-axum = "*"
+axum = { version = "*", features=["headers"] }
 tokio = { version = "*", features=["rt-multi-thread"] }
-anyhow = "*"
 serde = "*"
 serde_json = "*"
 jsonwebtoken = "*"
+headers = "*"

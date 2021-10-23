@@ -1,6 +1,38 @@
-use crate::{db, db::Pool};
+use crate::{auth::Claims, db, db::Pool};
 // use actix_web::{App, HttpServer, Responder, get, http::StatusCode, post, web};
 use axum::{AddExtensionLayer, Json, Router, extract::{Extension, Path as UrlPath}, handler::{get, post}, http::StatusCode, response::IntoResponse};
+use serde_json::json;
+
+pub enum JsonResponse {
+  Ok(serde_json::Value),
+  Error {
+    status: StatusCode, code: i32, msg: String,
+  },
+}
+
+impl JsonResponse {
+  pub fn error<S: ToString>(status: StatusCode, code: i32, msg: S) -> Self {
+    JsonResponse::Error { status, code, msg: msg.to_string() }
+  }
+
+  pub fn to_json(self) -> (StatusCode, Json<serde_json::Value>) {
+    match self {
+      JsonResponse::Ok(v) => (StatusCode::OK, Json(v)),
+      JsonResponse::Error{ status, code, msg } => (status, Json(json!({
+        "code": code, "msg": msg
+      }))),
+    }
+  }
+}
+
+impl IntoResponse for JsonResponse {
+  type Body = axum::body::Full<axum::body::Bytes>;
+  type BodyError = std::convert::Infallible;
+
+  fn into_response(self) -> axum::http::Response<Self::Body> {
+    self.to_json().into_response()
+  }
+}
 
 #[derive(Debug, serde::Deserialize)]
 pub struct UserCreateInfo {
@@ -19,7 +51,7 @@ pub struct UserLoginInfo {
 }
 
 // #[post("/users/create")]
-async fn create_user(conn: Extension<Pool>, Json(info): Json<UserCreateInfo>) -> impl IntoResponse {
+async fn create_user(conn: Extension<Pool>, Json(info): Json<UserCreateInfo>) -> JsonResponse {
   let mut conn = conn.get().expect("database error");
   println!("create_user {:?}", info);
 
@@ -33,28 +65,30 @@ async fn create_user(conn: Extension<Pool>, Json(info): Json<UserCreateInfo>) ->
     Ok(id)
   });
   match result {
-    Ok(id) => (StatusCode::OK, format!("success: {}", id)),
-    Err(e) => (StatusCode::BAD_REQUEST, format!("error: {:?}", e)), // TODO: 400 bad requests
+    Ok(id) => JsonResponse::Ok(json!({"id": id})),
+    Err(e) => JsonResponse::error(StatusCode::BAD_REQUEST, 1, format!("{:?}", e)),
   }
 }
 
 // #[post("/users/login")]
-async fn login_user(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> impl IntoResponse {
+async fn login_user(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> JsonResponse {
   let mut conn = conn.get().expect("database error");
 
   let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
     let id = db::UserCreate::find_id(&info.alias, conn)?;
     db::UserPassword::check(id, &info.password, conn)
   });
+  let token = "";
   match result {
-    Ok(true) => (StatusCode::OK, format!("success: {}", info.alias)),
-    Ok(false) => (StatusCode::FORBIDDEN, format!("error: wrong password")),
-    Err(e) => (StatusCode::BAD_REQUEST, format!("error: {:?}", e)), // TODO: 400 bad requests
+    Ok(true) => JsonResponse::Ok(json!({ "token": token })),
+    Ok(false) => JsonResponse::error(StatusCode::FORBIDDEN, 1, "wrong password"),
+    Err(e) => JsonResponse::error(StatusCode::BAD_REQUEST, 1, format!("{:?}", e)),
   }
 }
 
 // #[get("/{id}/{title}")]
-async fn index(UrlPath((id, title)): UrlPath<(u32, String)>) -> impl IntoResponse {
+async fn index(UrlPath((id, title)): UrlPath<(u32, String)>, claims: Option<Claims>) -> impl IntoResponse {
+  info!("claims: {:?}", claims);
   format!("{}, author: {}", title, id)
 }
 
