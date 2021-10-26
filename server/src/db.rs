@@ -51,11 +51,16 @@ impl UserPassword {
   pub fn gen_salt() -> String {
     let mut rng = rand::thread_rng();
     let bytes: [u8; 16] = rng.gen();
-    Self::hash(&bytes)
+    Self::_hash(&bytes)
   }
-  pub fn hash(x: &[u8]) -> String {
+  fn _hash(x: &[u8]) -> String {
     let s = sha2::Sha256::digest(x);
     format!("{:x}", s)
+  }
+  pub fn hash_salt<S1: AsRef<str>, S2: AsRef<str>>(password: S1, salt: S2) -> String {
+    let result = Self::_hash(format!("{}${}", password.as_ref(), salt.as_ref()).as_bytes());
+    debug!("hash_salt: {}${} => {}", password.as_ref(), salt.as_ref(), result);
+    result
   }
 
   pub fn new(id: i64, password: String, conn: &mut Conn) -> Self {
@@ -64,7 +69,7 @@ impl UserPassword {
       Ok(Self { current, .. }) => current,
       _ => Self::gen_salt(),
     };
-    let current = Self::hash(format!("{}${}", password, salt).as_bytes());
+    let current = Self::hash_salt(password, &salt);
     Self {
       id, salt, current
     }
@@ -77,6 +82,6 @@ impl UserPassword {
 
   pub fn check(id: i64, password: &str, conn: &mut Conn) -> anyhow::Result<bool> {
     let profile: UserPassword = secrets::table.select(UserPassword::as_select()).filter(secrets::id.eq(id)).get_result(conn)?;
-    Ok(Self::hash(format!("{}${}", password, profile.salt).as_bytes()) == profile.current)
+    Ok(Self::hash_salt(password, profile.salt) == profile.current)
   }
 }

@@ -1,4 +1,4 @@
-use crate::{auth::Claims, db, db::Pool};
+use crate::{auth::{self, Claims}, db, db::Pool};
 // use actix_web::{App, HttpServer, Responder, get, http::StatusCode, post, web};
 use axum::{AddExtensionLayer, Json, Router, extract::{Extension, Path as UrlPath}, handler::{get, post}, http::StatusCode, response::IntoResponse};
 use serde_json::json;
@@ -76,12 +76,17 @@ async fn login_user(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> J
 
   let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
     let id = db::UserCreate::find_id(&info.alias, conn)?;
-    db::UserPassword::check(id, &info.password, conn)
+    let correct = db::UserPassword::check(id, &info.password, conn)?;
+    Ok((id, correct))
   });
-  let token = "";
   match result {
-    Ok(true) => JsonResponse::Ok(json!({ "token": token })),
-    Ok(false) => JsonResponse::error(StatusCode::FORBIDDEN, 1, "wrong password"),
+    Ok((id, true)) => {
+      match auth::Claims::new(id, 3600).issue() {
+        Ok(token) => JsonResponse::Ok(json!({ "token": token })),
+        Err(e) => JsonResponse::error(StatusCode::INTERNAL_SERVER_ERROR, 1, format!("{:?}", e)),
+      }
+    },
+    Ok((_, false)) => JsonResponse::error(StatusCode::FORBIDDEN, 1, "wrong password"),
     Err(e) => JsonResponse::error(StatusCode::BAD_REQUEST, 1, format!("{:?}", e)),
   }
 }

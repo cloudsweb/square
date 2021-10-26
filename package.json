@@ -1,7 +1,8 @@
 {
   "scripts": {
-    "createdb": "pg_ctl -D data init",
-    "startdb": "pg_ctl -D data -o '-p7039' -l postgres.log start",
+    "dbcreate": "pg_ctl -D data init",
+    "dbstart": "pg_ctl -D data -o '-p7039' -l postgres.log start",
+    "dbshell": "psql -p7039 posts",
     "stop": "pg_ctl -D data stop",
     "diesel": "diesel --database-url postgresql://localhost:7039/posts",
     "dev-build": "cargo watch x build",

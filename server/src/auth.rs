@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use axum::{extract::{FromRequest, RequestParts, TypedHeader}, http::StatusCode};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::ErrorKind};
 use serde::{Deserialize, Serialize};
@@ -31,11 +33,13 @@ impl axum::response::IntoResponse for Error {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
   pub sub: String,
-  pub exp: usize,
+  pub exp: u64,
 }
 
 impl Claims {
-  pub fn new(id: i64, exp: usize) -> Self {
+  pub fn new(id: i64, duration: u64) -> Self {
+    let exp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
+      .map(|i| i.as_secs()+duration).unwrap_or_default();
     Self {
       sub: format!("#{}", id), exp
     }
