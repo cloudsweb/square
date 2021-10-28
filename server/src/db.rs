@@ -14,8 +14,18 @@ pub fn connect(url: &str) -> anyhow::Result<Pool> {
 }
 
 #[derive(Queryable, PartialEq, Debug, Selectable)]
-pub struct User {
+#[table_name = "users"]
+pub struct UserInfo {
   pub id: i64,
+  pub alias: String,
+  pub name: String,
+}
+
+impl UserInfo {
+  pub fn find_id(id: i64, conn: &mut Conn) -> anyhow::Result<Self> {
+    let result = users::table.select(Self::as_select()).filter(users::id.eq(id)).get_result(conn)?;
+    Ok(result)
+  }
 }
 
 #[derive(PartialEq, Debug, Insertable)]

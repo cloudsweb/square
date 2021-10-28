@@ -7,8 +7,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive } from 'vue'
+import { defineComponent, inject, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import State from '../lib/state'
 
 class UserInfo {
   alias?: string
@@ -18,31 +19,18 @@ class UserInfo {
 export default defineComponent({
   setup() {
     const user = reactive(new UserInfo())
+    const state = inject<State>('state')
     const router = useRouter()
     const submit = async () => {
       console.log(user)
       // 1. check
       // 2. submit
-      try {
-        const resp = await fetch('/api/users/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(user),
-        })
 
-        const result = await resp.json()
-        
-        // TODO: check user.alias
-        if (result.token != null && result.token != '') {
-          console.log(`token: ${result.token}`)
-        }
+      state?.login(user.alias ?? '', user.password ?? '')
 
-        if (user.alias != null && user.alias != '') {
-          router.push(`/${user.alias}`)
-        }
-      } catch {}
+      if (user.alias != null && user.alias != '') {
+        router.push(`/${user.alias}`)
+      }
     }
     return { user, submit }
   },

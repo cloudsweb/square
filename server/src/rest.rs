@@ -51,9 +51,9 @@ pub struct UserLoginInfo {
 }
 
 // #[post("/users/create")]
-async fn create_user(conn: Extension<Pool>, Json(info): Json<UserCreateInfo>) -> JsonResponse {
+async fn user_create(conn: Extension<Pool>, Json(info): Json<UserCreateInfo>) -> JsonResponse {
   let mut conn = conn.get().expect("database error");
-  println!("create_user {:?}", info);
+  println!("user_create {:?}", info);
 
   let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
     let id = db::UserCreate {
@@ -71,7 +71,7 @@ async fn create_user(conn: Extension<Pool>, Json(info): Json<UserCreateInfo>) ->
 }
 
 // #[post("/users/login")]
-async fn login_user(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> JsonResponse {
+async fn user_login(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> JsonResponse {
   let mut conn = conn.get().expect("database error");
 
   let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
@@ -91,6 +91,22 @@ async fn login_user(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> J
   }
 }
 
+async fn user_info(conn: Extension<Pool>, UrlPath((id,)): UrlPath<(u64,)>, claims: Option<Claims>) -> JsonResponse {
+  let mut conn = conn.get().expect("database error");
+
+  let is_me = claims.as_ref().map(|i| i.sub == format!("#{}", id)) == Some(true);
+  info!("claims({}): {:?}", is_me, claims);
+  let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
+    Ok(db::UserInfo::find_id(id as i64, conn)?)
+  });
+  match result {
+    Ok(result) => {
+      JsonResponse::Ok(json!({ "alias": result.alias, "nickname": result.name }))
+    },
+    Err(e) => JsonResponse::error(StatusCode::BAD_REQUEST, 1, format!("{:?}", e)),
+  }
+}
+
 // #[get("/{id}/{title}")]
 async fn index(UrlPath((id, title)): UrlPath<(u32, String)>, claims: Option<Claims>) -> impl IntoResponse {
   info!("claims: {:?}", claims);
@@ -103,9 +119,10 @@ pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
   // build our application with a route
   let app = Router::new()
     // `GET /` goes to `root`
-    .route("/users/create", post(create_user))
+    .route("/users/create", post(user_create))
     // `POST /users` goes to `create_user`
-    .route("/users/login", post(login_user))
+    .route("/users/login", post(user_login))
+    .route("/users/:id/info", get(user_info))
     .route("/:id/:title", get(index))
     .layer(AddExtensionLayer::new(conn));
   // tracing::debug!("listening on {}", addr);
