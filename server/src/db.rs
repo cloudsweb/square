@@ -1,6 +1,7 @@
 use diesel::{QueryDsl, RunQueryDsl, SelectableHelper};
 use rand::Rng;
 use sha2::Digest;
+use uuid::Uuid;
 use crate::diesel::ExpressionMethods;
 
 use crate::schema::{users, secrets, posts};
@@ -22,9 +23,14 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
-  pub fn find_id(id: i64, conn: &mut Conn) -> anyhow::Result<Self> {
+  pub fn get(id: i64, conn: &mut Conn) -> anyhow::Result<Self> {
     let result = users::table.select(Self::as_select()).filter(users::id.eq(id)).get_result(conn)?;
     Ok(result)
+  }
+
+  pub fn find_id(alias: &str, conn: &mut Conn) -> anyhow::Result<i64> {
+    let id = users::table.select(users::id).filter(users::alias.eq(alias)).get_result(conn)?;
+    Ok(id)
   }
 }
 
@@ -40,11 +46,6 @@ pub struct UserCreate {
 impl UserCreate {
   pub fn exec(self, conn: &mut Conn) -> anyhow::Result<i64> {
     let id = diesel::insert_into(users::table).values(&self).returning(users::id).get_result(conn)?;
-    Ok(id)
-  }
-
-  pub fn find_id(alias: &str, conn: &mut Conn) -> anyhow::Result<i64> {
-    let id = users::table.select(users::id).filter(users::alias.eq(alias)).get_result(conn)?;
     Ok(id)
   }
 }
@@ -93,5 +94,21 @@ impl UserPassword {
   pub fn check(id: i64, password: &str, conn: &mut Conn) -> anyhow::Result<bool> {
     let profile: UserPassword = secrets::table.select(UserPassword::as_select()).filter(secrets::id.eq(id)).get_result(conn)?;
     Ok(Self::hash_salt(password, profile.salt) == profile.current)
+  }
+}
+
+#[derive(PartialEq, Debug, Queryable, Selectable, Insertable)]
+#[table_name = "posts"]
+pub struct PostCreate {
+  pub author_id: i64,
+  pub author_name: String,
+  pub title: String,
+  pub content: String,
+}
+
+impl PostCreate {
+  pub fn exec(self, conn: &mut Conn) -> anyhow::Result<Uuid> {
+    let id = diesel::insert_into(posts::table).values(&self).returning(posts::id).get_result(conn)?;
+    Ok(id)
   }
 }

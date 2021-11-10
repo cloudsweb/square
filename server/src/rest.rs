@@ -75,7 +75,7 @@ async fn user_login(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> J
   let mut conn = conn.get().expect("database error");
 
   let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
-    let id = db::UserCreate::find_id(&info.alias, conn)?;
+    let id = db::UserInfo::find_id(&info.alias, conn)?;
     let correct = db::UserPassword::check(id, &info.password, conn)?;
     Ok((id, correct))
   });
@@ -97,7 +97,7 @@ async fn user_info(conn: Extension<Pool>, UrlPath((id,)): UrlPath<(u64,)>, claim
   let is_me = claims.as_ref().map(|i| i.sub == format!("#{}", id)) == Some(true);
   info!("claims({}): {:?}", is_me, claims);
   let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
-    Ok(db::UserInfo::find_id(id as i64, conn)?)
+    Ok(db::UserInfo::get(id as i64, conn)?)
   });
   match result {
     Ok(result) => {
@@ -113,6 +113,33 @@ async fn index(UrlPath((id, title)): UrlPath<(u32, String)>, claims: Option<Clai
   format!("{}, author: {}", title, id)
 }
 
+// #[get("/{id}/{title}")]
+async fn new_index(conn: Extension<Pool>, UrlPath((alias, title)): UrlPath<(String, String)>, claims: Option<Claims>, content: String) -> impl IntoResponse {
+  let mut conn = conn.get().expect("database error");
+
+  info!("claims: {:?}", claims);
+  let id = alias.parse::<i64>().ok();
+  let result: anyhow::Result<_> = conn.build_transaction().run(|conn| {
+    let id = match id {
+      Some(id) => id,
+      None => db::UserInfo::find_id(&alias, conn)?,
+    };
+    let user = db::UserInfo::get(id, conn)?;
+    let post_id = db::PostCreate {
+      author_id: id,
+      author_name: user.name,
+      title, content,
+    }.exec(conn)?;
+    Ok(post_id)
+  });
+  match result {
+    Ok(result) => {
+      JsonResponse::Ok(json!({ "id": result.to_string() }))
+    },
+    Err(e) => JsonResponse::error(StatusCode::BAD_REQUEST, 1, format!("{:?}", e)),
+  }
+}
+
 // #[actix_web::main]
 pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
   let bind_addr = bind_addr.parse().map_err(|_| std::io::ErrorKind::InvalidInput)?;
@@ -124,6 +151,7 @@ pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
     .route("/users/login", post(user_login))
     .route("/users/:id/info", get(user_info))
     .route("/:id/:title", get(index))
+    .route("/:id/:title", post(new_index))
     .layer(AddExtensionLayer::new(conn));
   // tracing::debug!("listening on {}", addr);
   axum::Server::bind(&bind_addr)
