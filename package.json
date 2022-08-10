@@ -7,6 +7,7 @@
     "diesel": "diesel --database-url postgresql://localhost:7039/posts",
     "dev-build": "cargo watch x build",
     "dev-run": "cargo watch -w target/debug/server -s target/debug/server",
-    "web": "yarn --cwd pages"
+    "web": "yarn --cwd web",
+    "webdev": "yarn --cwd web dev"
   }
 }

@@ -9,7 +9,7 @@
 <script lang="ts">
 import { defineComponent, inject, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import State from '../lib/state'
+import type State from '@/lib/state'
 
 class UserInfo {
   alias?: string

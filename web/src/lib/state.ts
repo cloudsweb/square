@@ -24,7 +24,7 @@ export default class State {
       })
 
       const result = await resp.json()
-      
+
       // TODO: check user.alias
       if (result.token != null && result.token != '') {
         this.alias = alias

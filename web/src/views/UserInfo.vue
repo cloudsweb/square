@@ -6,7 +6,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, inject } from 'vue'
-import State from '../lib/state'
+import type State from '@/lib/state'
 
 export default defineComponent({
   setup() {
