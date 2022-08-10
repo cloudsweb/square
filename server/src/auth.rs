@@ -19,10 +19,7 @@ impl From<ErrorKind> for Error {
 }
 
 impl axum::response::IntoResponse for Error {
-  type Body = axum::body::Full<axum::body::Bytes>;
-  type BodyError = std::convert::Infallible;
-
-  fn into_response(self) -> axum::http::Response<Self::Body> {
+  fn into_response(self) -> axum::response::Response {
     match self {
       Error::JWT(e) => (StatusCode::BAD_REQUEST, format!("invalid token: {:?}", e)),
       Error::Authorization => (StatusCode::FORBIDDEN, format!("no permission to resource")),

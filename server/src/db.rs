@@ -15,7 +15,7 @@ pub fn connect(url: &str) -> anyhow::Result<Pool> {
 }
 
 #[derive(Queryable, PartialEq, Debug, Selectable)]
-#[table_name = "users"]
+#[diesel(table_name = users)]
 pub struct UserInfo {
   pub id: i64,
   pub alias: String,
@@ -35,7 +35,7 @@ impl UserInfo {
 }
 
 #[derive(PartialEq, Debug, Insertable)]
-#[table_name = "users"]
+#[diesel(table_name = users)]
 pub struct UserCreate {
   pub alias: String,
   pub name: String,
@@ -51,7 +51,7 @@ impl UserCreate {
 }
 
 #[derive(PartialEq, Debug, Queryable, Selectable, Insertable)]
-#[table_name = "secrets"]
+#[diesel(table_name = secrets)]
 pub struct UserPassword {
   pub id: i64,
   pub current: String,
@@ -98,7 +98,7 @@ impl UserPassword {
 }
 
 #[derive(PartialEq, Debug, Queryable, Selectable, Insertable)]
-#[table_name = "posts"]
+#[diesel(table_name = posts)]
 pub struct PostCreate {
   pub author_id: i64,
   pub author_name: String,

@@ -1,6 +1,12 @@
 use crate::{auth::{self, Claims}, db, db::Pool};
 // use actix_web::{App, HttpServer, Responder, get, http::StatusCode, post, web};
-use axum::{AddExtensionLayer, Json, Router, extract::{Extension, Path as UrlPath}, handler::{get, post}, http::StatusCode, response::IntoResponse};
+use axum::{
+  Json, Router,
+  extract::{Extension, Path as UrlPath},
+  routing::{get, post},
+  http::StatusCode,
+  response::{IntoResponse, Response}
+};
 use serde_json::json;
 
 pub enum JsonResponse {
@@ -26,10 +32,7 @@ impl JsonResponse {
 }
 
 impl IntoResponse for JsonResponse {
-  type Body = axum::body::Full<axum::body::Bytes>;
-  type BodyError = std::convert::Infallible;
-
-  fn into_response(self) -> axum::http::Response<Self::Body> {
+  fn into_response(self) -> Response {
     self.to_json().into_response()
   }
 }
@@ -152,7 +155,7 @@ pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
     .route("/users/:id/info", get(user_info))
     .route("/:id/:title", get(index))
     .route("/:id/:title", post(new_index))
-    .layer(AddExtensionLayer::new(conn));
+    .layer(Extension(conn));
   // tracing::debug!("listening on {}", addr);
   axum::Server::bind(&bind_addr)
     .serve(app.into_make_service())
