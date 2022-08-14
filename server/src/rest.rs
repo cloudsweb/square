@@ -156,7 +156,7 @@ pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
     .route("/:id/:title", get(index))
     .route("/:id/:title", post(new_index))
     .layer(Extension(conn));
-  // tracing::debug!("listening on {}", addr);
+  info!("listening on {}", bind_addr);
   axum::Server::bind(&bind_addr)
     .serve(app.into_make_service())
     .await

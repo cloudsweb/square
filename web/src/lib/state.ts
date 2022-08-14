@@ -6,7 +6,7 @@ export default class State {
 
   parse_jwt(token: string) {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+    const jsonPayload = decodeURIComponent(Buffer.from(base64, 'base64').toString().split('').map(function(c) {
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
 
@@ -33,7 +33,7 @@ export default class State {
         const tokenContent = this.parse_jwt(this.token!);
         let id = tokenContent.sub as string
         if (id.startsWith('#')) {
-          id = id.substr(1)
+          id = id.slice(1)
         }
         this.id = id
 

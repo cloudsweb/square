@@ -5,9 +5,9 @@
     "dbshell": "psql -p7039 posts",
     "dbstop": "pg_ctl -D data stop",
     "diesel": "diesel --database-url postgresql://localhost:7039/posts",
-    "dev-build": "cargo watch x build",
-    "dev-run": "cargo watch -w target/debug/server -s target/debug/server",
+    "dev-build": "cargo watch -w server --why -x build",
+    "dev-run": "cargo watch -w target/debug/square-core -w .env --ignore-nothing --poll -s target/debug/square-core",
     "web": "yarn --cwd web",
-    "webdev": "yarn --cwd web dev"
+    "dev-web": "yarn --cwd web dev"
   }
 }
