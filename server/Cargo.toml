@@ -10,14 +10,15 @@ edition = "2018"
 log = "*"
 flexi_logger = "*"
 async-trait = "*"
-anyhow = "*"
+thiserror = "*"
 dotenv = "*"
 rand = "*"
 uuid = "*"
 sha2 = "*"
 diesel = { version = "2.0.0-rc.1", features=["postgres", "uuid", "r2d2"] }
-axum = { version = "*", features=["headers"] }
+axum = { version = "*", features=["headers", "macros"] }
 tokio = { version = "*", features=["rt-multi-thread"] }
+tower-http = { version = "*", features=["trace"] }
 serde = "*"
 serde_json = "*"
 jsonwebtoken = "*"

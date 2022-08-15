@@ -1,15 +1,26 @@
-use diesel::{QueryDsl, RunQueryDsl, SelectableHelper};
+use diesel::{QueryDsl, RunQueryDsl, SelectableHelper, OptionalExtension};
 use rand::Rng;
 use sha2::Digest;
 use uuid::Uuid;
 use crate::diesel::ExpressionMethods;
 
 use crate::schema::{users, secrets, posts};
+use crate::common::{UserId, ThisError};
 
 pub type Conn = diesel::PgConnection;
 pub type Pool<Conn=diesel::PgConnection> = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<Conn>>;
 
-pub fn connect(url: &str) -> anyhow::Result<Pool> {
+pub type Result<T, E=Error>=std::result::Result<T, E>;
+
+#[derive(Debug, ThisError)]
+pub enum Error {
+  #[error("pool error: {0}")]
+  Pool(#[from] diesel::r2d2::PoolError),
+  #[error("diesel error: {0}")]
+  Diesel(#[from] diesel::result::Error),
+}
+
+pub fn connect(url: &str) -> Result<Pool> {
   let manager = diesel::r2d2::ConnectionManager::<diesel::PgConnection>::new(url);
   Ok(diesel::r2d2::Pool::builder().build(manager)?)
 }
@@ -23,13 +34,13 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
-  pub fn get(id: i64, conn: &mut Conn) -> anyhow::Result<Self> {
-    let result = users::table.select(Self::as_select()).filter(users::id.eq(id)).get_result(conn)?;
+  pub fn get(id: UserId, conn: &mut Conn) -> Result<Option<Self>> {
+    let result = users::table.select(Self::as_select()).filter(users::id.eq(id as i64)).get_result(conn).optional()?;
     Ok(result)
   }
 
-  pub fn find_id(alias: &str, conn: &mut Conn) -> anyhow::Result<i64> {
-    let id = users::table.select(users::id).filter(users::alias.eq(alias)).get_result(conn)?;
+  pub fn find_id(alias: &str, conn: &mut Conn) -> Result<Option<UserId>> {
+    let id = users::table.select(users::id).filter(users::alias.eq(alias)).get_result(conn).optional()?.map(|i: i64| i as UserId);
     Ok(id)
   }
 }
@@ -44,7 +55,7 @@ pub struct UserCreate {
 }
 
 impl UserCreate {
-  pub fn exec(self, conn: &mut Conn) -> anyhow::Result<i64> {
+  pub fn exec(self, conn: &mut Conn) -> Result<i64> {
     let id = diesel::insert_into(users::table).values(&self).returning(users::id).get_result(conn)?;
     Ok(id)
   }
@@ -86,13 +97,13 @@ impl UserPassword {
     }
   }
 
-  pub fn exec(self, conn: &mut Conn) -> anyhow::Result<()> {
+  pub fn exec(self, conn: &mut Conn) -> Result<()> {
     diesel::insert_into(secrets::table).values(&self).execute(conn)?;
     Ok(())
   }
 
-  pub fn check(id: i64, password: &str, conn: &mut Conn) -> anyhow::Result<bool> {
-    let profile: UserPassword = secrets::table.select(UserPassword::as_select()).filter(secrets::id.eq(id)).get_result(conn)?;
+  pub fn check(id: UserId, password: &str, conn: &mut Conn) -> Result<bool> {
+    let profile: UserPassword = secrets::table.select(UserPassword::as_select()).filter(secrets::id.eq(id as i64)).get_result(conn)?;
     Ok(Self::hash_salt(password, profile.salt) == profile.current)
   }
 }
@@ -107,7 +118,7 @@ pub struct PostCreate {
 }
 
 impl PostCreate {
-  pub fn exec(self, conn: &mut Conn) -> anyhow::Result<Uuid> {
+  pub fn exec(self, conn: &mut Conn) -> Result<Uuid> {
     let id = diesel::insert_into(posts::table).values(&self).returning(posts::id).get_result(conn)?;
     Ok(id)
   }

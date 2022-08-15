@@ -1,50 +1,90 @@
+use crate::{common::*, db::UserInfo};
 use std::time::SystemTime;
 
-use axum::{extract::{FromRequest, RequestParts, TypedHeader}, http::StatusCode};
+use axum::extract::{FromRequest, RequestParts, TypedHeader};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::ErrorKind};
 use serde::{Deserialize, Serialize};
 
 const KEY: &str = "";
 
-#[derive(Debug)]
+pub type Result<T, E=Error> = std::result::Result<T, E>;
+#[derive(Debug, Clone, ThisError)]
 pub enum Error {
-  JWT(jsonwebtoken::errors::ErrorKind), // no clone for this
+  #[error("auth internal error: {0}")]
+  Internal(&'static str),
+  #[error("login failed: {0}")]
+  Login(&'static str),
+  #[error("signing failed: {0:?}")]
+  Signing(jsonwebtoken::errors::Error),
+  #[error("invalid token: {0:?}")]
+  Authentication(jsonwebtoken::errors::ErrorKind), // no clone for this
+  #[error("no permision to resource")]
   Authorization,
 }
 
 impl From<ErrorKind> for Error {
   fn from(e: ErrorKind) -> Self {
-    Error::JWT(e)
+    Error::Authentication(e)
   }
 }
 
-impl axum::response::IntoResponse for Error {
-  fn into_response(self) -> axum::response::Response {
+impl IntoErrorResp for Error {
+  fn error_code(&self) -> (StatusCode, ErrorCode) {
     match self {
-      Error::JWT(e) => (StatusCode::BAD_REQUEST, format!("invalid token: {:?}", e)),
-      Error::Authorization => (StatusCode::FORBIDDEN, format!("no permission to resource")),
-    }.into_response()
+      Error::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, ErrorCode::Auth),
+      _ => (StatusCode::FORBIDDEN, ErrorCode::Auth)
+    }
+  }
+}
+
+impl IntoResponse for Error {
+  fn into_response(self) -> Response {
+    let (s, _, m) = self.into_error_resp();
+    (s, m).into_response()
   }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-  pub sub: String,
+  pub sub: UserId,
   pub exp: u64,
+  #[serde(skip)]
+  pub info: Option<UserInfo>,
 }
 
 impl Claims {
-  pub fn new(id: i64, duration: u64) -> Self {
+  pub fn new(id: UserId, duration: u64) -> Self {
     let exp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
       .map(|i| i.as_secs()+duration).unwrap_or_default();
     Self {
-      sub: format!("#{}", id), exp
+      sub: id, exp, info: None,
     }
   }
 
-  pub fn issue(&self) -> anyhow::Result<String> {
-    let s = encode(&Header::default(), self, &EncodingKey::from_secret(KEY.as_bytes()))?;
+  pub fn issue(&self) -> Result<String, Error> {
+    let s = encode(&Header::default(), self, &EncodingKey::from_secret(KEY.as_bytes())).map_err(Error::Signing)?;
     Ok(s)
+  }
+
+  pub fn check_id(&self, id: UserId) -> bool {
+    self.sub == id
+  }
+
+  pub fn login(alias: &str, password: &str, conn: &mut db::Conn) -> Result<Self> {
+    let result: db::Result<_> = conn.build_transaction().run(|conn| {
+      let id = db::UserInfo::find_id(alias, conn)?;
+      if id.is_none() {
+        return Ok((None, false))
+      }
+      let correct = db::UserPassword::check(id.expect("none checked"), &password, conn)?;
+      Ok((id, correct))
+    });
+    match result {
+      Ok((Some(id), true)) => Ok(Self::new(id, 3600)),
+      Ok((None, _)) => Err(Error::Login("wrong alias")),
+      Ok((_, false)) => Err(Error::Login("wrong password")),
+      Err(_) => Err(Error::Internal("db check password")),
+    }
   }
 }
 
@@ -60,10 +100,18 @@ where
     let TypedHeader(headers::Authorization(bearer)) =
       TypedHeader::<headers::Authorization<headers::authorization::Bearer>>::from_request(req)
         .await.map_err(|_| ErrorKind::InvalidToken)?;
+    let Extension(pool) = Extension::<Pool>::from_request(req).await.map_err(|_| Error::Internal("pool not presence"))?;
     // Decode the user data
-    let token_data = decode(bearer.token(), &DecodingKey::from_secret(KEY.as_bytes()), &Validation::default())
-      .map_err(|_| ErrorKind::InvalidToken)?;
+    let mut token_data = decode::<Claims>(bearer.token(), &DecodingKey::from_secret(KEY.as_bytes()), &Validation::default())
+    .map_err(|err| err.into_kind())?;
 
+    let mut conn = pool.get().map_err(|_| Error::Internal("pool get conn"))?;
+    token_data.claims.info = UserInfo::get(token_data.claims.sub, &mut conn).map_err(|_| Error::Internal("user_info get"))?;
+    if token_data.claims.info.is_none() {
+      return Err(Error::Internal("user not found"))?;
+    }
+
+    debug!("claims: {:?}", token_data.claims);
     Ok(token_data.claims)
   }
 }

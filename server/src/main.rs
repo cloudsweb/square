@@ -1,19 +1,19 @@
 #[macro_use] extern crate log;
-#[macro_use] extern crate async_trait;
 #[macro_use] extern crate diesel;
 
 // use diesel::prelude::*;
-mod schema;
-mod db;
-mod auth;
-mod rest;
+pub mod common;
+pub mod schema;
+pub mod db;
+pub mod auth;
+pub mod rest;
 
 const DATABASE_URL: &'static str = "postgresql://localhost:7039/posts";
 const WEB_URL: &'static str = "127.0.0.1:7079";
 
 fn main() {
   #[cfg(debug_assertions)]
-  flexi_logger::Logger::try_with_env_or_str("debug").unwrap().start().unwrap();
+  flexi_logger::Logger::try_with_env_or_str("debug,hyper=info").unwrap().start().unwrap();
   #[cfg(not(debug_assertions))]
   flexi_logger::Logger::try_with_env_or_str("info").unwrap().start().unwrap();
   dotenv::dotenv().ok();
