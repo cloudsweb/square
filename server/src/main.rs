@@ -6,6 +6,7 @@ pub mod common;
 pub mod schema;
 pub mod db;
 pub mod auth;
+pub mod session;
 pub mod rest;
 
 const DATABASE_URL: &'static str = "postgresql://localhost:7039/posts";

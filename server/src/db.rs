@@ -25,7 +25,7 @@ pub fn connect(url: &str) -> Result<Pool> {
   Ok(diesel::r2d2::Pool::builder().build(manager)?)
 }
 
-#[derive(Queryable, PartialEq, Debug, Selectable)]
+#[derive(Debug, Clone, PartialEq, Selectable, Queryable)]
 #[diesel(table_name = users)]
 pub struct UserInfo {
   pub id: i64,

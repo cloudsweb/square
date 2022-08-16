@@ -1,9 +1,8 @@
 use crate::{common::*, db::UserInfo};
 use std::time::SystemTime;
 
-use axum::extract::{FromRequest, RequestParts, TypedHeader};
+use axum::extract::TypedHeader;
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::ErrorKind};
-use serde::{Deserialize, Serialize};
 
 const KEY: &str = "";
 
@@ -98,12 +97,11 @@ where
   async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
     // Extract the token from the authorization header
     let TypedHeader(headers::Authorization(bearer)) =
-      TypedHeader::<headers::Authorization<headers::authorization::Bearer>>::from_request(req)
-        .await.map_err(|_| ErrorKind::InvalidToken)?;
+      TypedHeader::<headers::Authorization<headers::authorization::Bearer>>::from_request(req).await.map_err(|_| ErrorKind::InvalidToken)?;
     let Extension(pool) = Extension::<Pool>::from_request(req).await.map_err(|_| Error::Internal("pool not presence"))?;
     // Decode the user data
     let mut token_data = decode::<Claims>(bearer.token(), &DecodingKey::from_secret(KEY.as_bytes()), &Validation::default())
-    .map_err(|err| err.into_kind())?;
+      .map_err(|err| err.into_kind())?;
 
     let mut conn = pool.get().map_err(|_| Error::Internal("pool get conn"))?;
     token_data.claims.info = UserInfo::get(token_data.claims.sub, &mut conn).map_err(|_| Error::Internal("user_info get"))?;

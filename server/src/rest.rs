@@ -5,6 +5,7 @@ use axum::{
   extract::{Path as UrlPath, OriginalUri},
   routing::{get, post},
 };
+use axum_sessions::extractors::WritableSession;
 use tower_http::{trace::TraceLayer};
 use serde_json::json;
 
@@ -54,6 +55,16 @@ async fn user_login(conn: Extension<Pool>, Json(info): Json<UserLoginInfo>) -> J
   }
 }
 
+// #[get("/users/refresh")]
+async fn user_refresh(_conn: Extension<Pool>, claims: Claims, session: WritableSession) -> JsonResponse {
+  match claims.info {
+    Some(data) => MutSessionData::from(data, session).save(),
+    None => return Error::UserNotFound(claims.sub).into(),
+  }
+
+  json!("success").into()
+}
+
 async fn user_info(conn: Extension<Pool>, UrlPath((id,)): UrlPath<(u64,)>, claims: Option<Claims>) -> JsonResponse {
   let mut conn = conn.get().expect("database error");
 
@@ -72,15 +83,15 @@ async fn user_info(conn: Extension<Pool>, UrlPath((id,)): UrlPath<(u64,)>, claim
 }
 
 // #[get("/{id}/{title}")]
-async fn index(UrlPath((id, title)): UrlPath<(u64, String)>, claims: Option<Claims>) -> impl IntoResponse {
+async fn index(UrlPath((id, title)): UrlPath<(u64, String)>, session: Option<SessionData>) -> impl IntoResponse {
   format!("{}, author: {}", title, id)
 }
 
 // #[get("/{id}/{title}")]
-async fn new_index(conn: Extension<Pool>, UrlPath((alias, title)): UrlPath<(String, String)>, uri: OriginalUri, claims: Option<Claims>, content: String) -> JsonResponse {
+async fn new_index(conn: Extension<Pool>, UrlPath((alias, title)): UrlPath<(String, String)>, uri: OriginalUri, session: Option<SessionData>, content: String) -> JsonResponse {
   let mut conn = conn.get().expect("database error");
 
-  let user = match claims.and_then(|i| i.info) {
+  let user = match session {
     Some(user) => user,
     None => return Error::LoginRequired(uri.0.to_string()).into(),
   };
@@ -90,7 +101,7 @@ async fn new_index(conn: Extension<Pool>, UrlPath((alias, title)): UrlPath<(Stri
   let result: db::Result<_> = conn.build_transaction().run(|conn| {
     let post_id = db::PostCreate {
       author_id: user.id as i64,
-      author_name: user.name,
+      author_name: user.info.expect("userinfo").name,
       title, content,
     }.exec(conn)?;
     Ok(post_id)
@@ -110,6 +121,7 @@ pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
     .route("/users/create", post(user_create))
     // `POST /users` goes to `create_user`
     .route("/users/login", post(user_login))
+    .route("/users/refresh", get(user_refresh))
     .route("/users/:id/info", get(user_info))
     .route("/:id/:title", get(index))
     .route("/:id/:title", post(new_index))
