@@ -13,8 +13,8 @@ const user = useUserStore()
         <a href='' @click="user.logout">Sign out</a>
       </span>
       <span v-else>
-        <router-link to='/users/create'>Sign Up</router-link> /
-        <router-link to='/users/login'>Sign In</router-link>
+        <router-link to='/users/login'>Sign In</router-link> /
+        <router-link to='/users/create'>Sign Up</router-link>
       </span>
     </div>
     <router-view />

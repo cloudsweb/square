@@ -38,11 +38,19 @@ async function login(alias: string, password: string) {
     if (result.token != null && result.token != '') {
       const token = result.token
 
-      const tokenContent = parse_jwt(token);
-      const sub = tokenContent.sub as string
+      const tokenContent = parse_jwt(token)
+      console.log(tokenContent)
+      const sub = tokenContent.sub
       let id = 0
-      if (typeof sub == 'string' && sub.startsWith('#')) {
-        id = parseInt(sub.slice(1))
+      if (typeof sub == 'string') {
+        if (sub.startsWith('#'))
+          id = parseInt(sub.slice(1))
+        else
+          id = parseInt(sub)
+      } else if (typeof sub == 'number') {
+        id = sub
+      } else {
+        id = parseInt(sub)
       }
 
       console.log(`token: ${result.token}`)
@@ -71,12 +79,39 @@ async function signup(info: UserCreateInfo) {
   return false
 }
 
+async function refresh(token: string) {
+  try {
+    await fetch('/api/users/refresh', {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+    })
+  } catch {
+    console.warn("refresh failed")
+  }
+}
+
+async function get_user_info(id: string | number) {
+  try {
+    const resp = await fetch(`/api/users/${id}/info`, {
+      headers: {
+      }
+    })
+    const result = await resp.json()
+    return { nickname: result.nickname }
+  } catch (e) {
+    console.warn("get_user_info failed", e)
+  }
+}
+
 export const useUserStore = defineStore({
   id: 'user',
   state: () => ({
     _id: 0,
     _alias: null as string | null,
     _name: '',
+    _token: '',
   }),
   getters: {
     id: (state) => state._id,
@@ -94,9 +129,20 @@ export const useUserStore = defineStore({
         console.warn("login failed")
         return
       }
+      console.log(info)
       this._id = info.id
       this._alias = info.alias
-      this._name = "TODO: my test"
+      this._name = "@" + info.alias
+      this._token = info.token
+      await this.refresh()
+    },
+
+    async refresh() {
+      await refresh(this._token)
+      const info = await get_user_info(this._id)
+      if (info != null) {
+        this._name = info.nickname
+      }
     },
 
     async signup(login_info: UserCreateInfo) {
@@ -106,7 +152,7 @@ export const useUserStore = defineStore({
     async logout() {
       this._id = 0
       this._alias = null
-    }
+    },
   }
 })
 

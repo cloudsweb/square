@@ -32,17 +32,13 @@ pub struct SessionData {
 
 impl SessionData {
   pub async fn from(session: &Session, pool: Pool) -> Result<Self, Error> {
-    let id = match session.get::<u64>("id") {
-      Some(id) => id,
-      None => {
-        return Err(Error::Presence("id"))
-      }
-    };
+    debug!("session len: {}, id: {:?}, alias: {:?}", session.len(), session.get_raw("id"), session.get_raw("alias"));
+    let id = session.get::<u64>("id").ok_or_else(|| Error::Presence("id"))?;
     let mut conn = pool.get().map_err(|_| Error::DbSetup)?;
     let info = db::UserInfo::get(id, &mut conn).map_err(|_| Error::DbExec)?.ok_or_else(|| Error::DbResult)?;
     Ok(Self {
       id,
-      alias: session.get::<String>("alias").ok_or_else(|| Error::Presence("alias"))?,
+      alias: session.get_raw("alias").ok_or_else(|| Error::Presence("alias"))?,
       info: Some(info),
     })
   }
@@ -75,6 +71,7 @@ impl MutSessionData {
   }
 
   pub fn save(&mut self) {
+    debug!("save {} {}", self.cache.id, self.cache.alias);
     self.writer.insert_raw("id", self.cache.id.to_string());
     self.writer.insert_raw("alias", self.cache.alias.to_string());
   }

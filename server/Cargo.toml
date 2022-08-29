@@ -12,7 +12,7 @@ log = "*"
 flexi_logger = "*"
 thiserror = "*"
 dotenv = "*"
-rand = "*"
+rand = { version = "*", features=["min_const_gen"] }
 uuid = "*"
 sha2 = "*"
 serde = "*"

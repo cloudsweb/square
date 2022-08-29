@@ -6,7 +6,7 @@
     "dbstop": "pg_ctl -D data stop",
     "diesel": "diesel --database-url postgresql://localhost:7039/posts",
     "dev-build": "cargo watch -w server --why -x build",
-    "dev-run": "cargo watch -w target/debug/square-core -w .env --ignore-nothing --poll -s target/debug/square-core",
+    "dev-run": "RUST_BACKTRACE=1 cargo watch -w target/debug/square-core -w .env --ignore-nothing --poll -s target/debug/square-core",
     "web": "yarn --cwd web",
     "dev-web": "yarn --cwd web dev"
   }

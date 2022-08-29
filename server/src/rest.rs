@@ -5,9 +5,10 @@ use axum::{
   extract::{Path as UrlPath, OriginalUri},
   routing::{get, post},
 };
-use axum_sessions::extractors::WritableSession;
+use axum_sessions::{SessionLayer, extractors::WritableSession};
 use tower_http::{trace::TraceLayer};
 use serde_json::json;
+use rand::Rng;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct UserCreateInfo {
@@ -65,11 +66,11 @@ async fn user_refresh(_conn: Extension<Pool>, claims: Claims, session: WritableS
   json!("success").into()
 }
 
-async fn user_info(conn: Extension<Pool>, UrlPath((id,)): UrlPath<(u64,)>, claims: Option<Claims>) -> JsonResponse {
+async fn user_info(conn: Extension<Pool>, UrlPath((id,)): UrlPath<(u64,)>, session: Option<SessionData>) -> JsonResponse {
   let mut conn = conn.get().expect("database error");
 
-  let is_me = claims.as_ref().map(|i| i.check_id(id)) == Some(true);
-  info!("claims({}): {:?}", is_me, claims);
+  let is_me = session.as_ref().map(|i| i.id == id) == Some(true);
+  info!("id: {}, session({}): {:?}", id, is_me, session);
   let result: db::Result<_> = conn.build_transaction().run(|conn| {
     Ok(db::UserInfo::get(id, conn)?)
   });
@@ -114,6 +115,8 @@ async fn new_index(conn: Extension<Pool>, UrlPath((alias, title)): UrlPath<(Stri
 
 // #[actix_web::main]
 pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
+  let secret = rand::thread_rng().gen::<[u8; 128]>();
+  let store = axum_sessions::async_session::MemoryStore::new();
   let bind_addr = bind_addr.parse().map_err(|_| std::io::ErrorKind::InvalidInput)?;
   // build our application with a route
   let app = Router::new()
@@ -126,6 +129,7 @@ pub async fn run(bind_addr: &str, conn: Pool) -> std::io::Result<()> {
     .route("/:id/:title", get(index))
     .route("/:id/:title", post(new_index))
     .layer(TraceLayer::new_for_http())
+    .layer(SessionLayer::new(store, &secret))
     .layer(Extension(conn));
   info!("listening on {}", bind_addr);
   axum::Server::bind(&bind_addr)
