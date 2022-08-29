@@ -1,7 +1,7 @@
 <script lang='ts' setup>
 import { reactive } from 'vue';
 import { useRouter } from 'vue-router'
-import { useUserStore, UserLoginInfo } from '@/lib/stores'
+import { useUserStore, UserLoginInfo } from '@/lib/store_user'
 
 const login_info = reactive(new UserLoginInfo)
 const router = useRouter()
