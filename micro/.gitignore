@@ -1,3 +1,6 @@
 go.sum
 *.gen.go
+*.gen_test.go
 gen.go
+gen_test.go
+*.pb.go

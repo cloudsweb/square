@@ -1,0 +1,19 @@
+syntax = "proto3";
+package LL__proto_package__TT;
+
+//+ import "google/protobuf/timestamp.proto";
+
+//~ ./go_package = {{ go_package }}
+option go_package = "./go_package";
+
+//+ {{#structs}}
+
+message LL__struct_name__TT {
+  //+ {{#fields}}
+  //~ optional  = {{ optional-str }}
+  //~ int32     = {{ rawtype }}
+  //~ 1         = {{ pos-idx }}
+  int32 LL__name__TT = 1; // optional
+  //+ {{/fields}}
+}
+//+ {{/structs}}

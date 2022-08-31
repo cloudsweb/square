@@ -1,0 +1,41 @@
+syntax = "proto3";
+package square.db;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "./dao/model";
+
+
+message Post {
+  int64 topic_id = 1; // required
+  string id = 2; // required
+  int32 floor = 3; // required
+  int64 author_id = 4; // required
+  string author_name = 5; // required
+  string title = 6; // required
+  string content = 7; // required
+  int32 revision = 8; // required
+  google.protobuf.Timestamp inserted_at = 9; // required
+  google.protobuf.Timestamp updated_at = 10; // required
+}
+
+message Secret {
+  int64 id = 1; // required
+  string current = 2; // required
+  string salt = 3; // required
+  string updated_ip = 4; // optional
+  google.protobuf.Timestamp updated_at = 5; // required
+}
+
+message User {
+  int64 id = 1; // required
+  string alias = 2; // required
+  string name = 3; // required
+  string email = 4; // optional
+  string phone = 5; // optional
+  string region = 6; // optional
+  string description = 7; // optional
+  string avatar = 8; // optional
+  google.protobuf.Timestamp inserted_at = 9; // required
+  google.protobuf.Timestamp updated_at = 10; // required
+}
