@@ -6,6 +6,7 @@ import "google/protobuf/timestamp.proto";
 option go_package = "./dao/model";
 
 
+// protobuf of PostORM
 message Post {
   int64 topic_id = 1; // required
   string id = 2; // required
@@ -19,6 +20,7 @@ message Post {
   google.protobuf.Timestamp updated_at = 10; // required
 }
 
+// protobuf of SecretORM
 message Secret {
   int64 id = 1; // required
   string current = 2; // required
@@ -27,6 +29,7 @@ message Secret {
   google.protobuf.Timestamp updated_at = 5; // required
 }
 
+// protobuf of UserORM
 message User {
   int64 id = 1; // required
   string alias = 2; // required

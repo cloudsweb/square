@@ -6,40 +6,54 @@ say "working in $worksapce";
 
 # run <ls -la>, $worksapce.add("dao/model").absolute;
 say "go run cmd/gen/main.go";
-run <git clean -fxd dao>, cwd=>$worksapce;
+run <git clean -fX dao>, cwd=>$worksapce;
 # run <go mod tidy>, cwd=>$worksapce;
 run <go run cmd/gen/main.go>, cwd=>$worksapce;
 
-my %type_map =
+my %protobuf_type_map =
   "time.Time" => "google.protobuf.Timestamp",
   ;
-grammar field_grammar {
-  rule TOP { <.ws> <ident> <type> "`"<tags>"`" }
-  rule tags { <subtag> +  }
-  token subtag { <ident>':"'<expr>'"' }
-  token expr { <-["]>+ }
-  token ident { <[a..zA..Z]>\w* }
-  token type { "*"?<[a..zA..Z]><[.\w]>* }
+
+class Table {
+  has Str $.name;
+  has %.names;
+  has @.fields;
+
+  multi method new($struct-name, $parse-tag, @fields) {
+    my %names = $parse-tag => $struct-name;
+    my $name = do given $parse-tag {
+      when "go_orm" { $struct-name.subst(/ORM$/) }
+      when "go_proto" { $struct-name }
+      default { $struct-name }
+    };
+    self.bless(:$name, :%names, :@fields)
+  }
 }
+
 class Field {
-  has Str $.goname;
-  has Str $.gotype;
   has Int $.idx;
-  has %.gotags;
+  has Str $.parse-tag;
+  has Str $.ident;
+  has Str $.type;
+  has Bool $.optional;
+  has %.names; # proto, go_orm, go_proto
+  has %.types;
+  has %.go-attrs; # gorm, json, protobuf, ...
+
+  method TWEAK {
+    $!optional //= %!types<go_orm> ?? %!types<go_orm>.starts-with('*') !! Bool;
+  }
 
   method rawtype {
-    my $gotype = $!gotype.subst(/^\*/);
-    if %type_map{$gotype} {
-      %type_map{$gotype}
+    my $gotype = %!types<go_orm>.subst(/^\*/);
+    if %protobuf_type_map{$gotype} {
+      %protobuf_type_map{$gotype}
     } else {
       $gotype
     }
   }
   method pos-idx {
     $!idx + 1
-  }
-  method optional {
-    $!gotype.starts-with('*')
   }
   method optional-str {
     if $.optional {
@@ -49,14 +63,38 @@ class Field {
     }
   }
   method name {
-    if %!gotags<json> {
-      %!gotags<json>.first
+    if %!go-attrs<json> {
+      %!go-attrs<json>.first
     } else {
       $.goname
     }
   }
+}
+grammar field_grammar {
+  rule TOP { <.ws> <ident> <type> "`"<tags>"`" <comment>? }
+  rule tags { <subtag> +  }
+  rule comment { '//'.* }
+  token subtag { <ident>':"'<expr>'"' }
+  token expr { <-["]>+ }
+  token ident { <[a..zA..Z]>\w* }
+  token type { "*"?<[a..zA..Z]><[.\w]>* }
+}
 
-  method TOP ($/) { make self.new(goname=>$<ident>.Str, gotype=>$<type>.Str, gotags=>$<tags>.made) }
+class Parser {
+  has Int $.idx;
+  has $.parse-tag = "go_orm"; # orm | protobuf
+
+  method TOP ($/) {
+    if !self.DEFINITE {
+      return self.new.TOP($/);
+    }
+    my $name = $<ident>.Str;
+    my $gotype = $<type>.Str;
+    my %attrs = $<tags>.made;
+    my $ident = %attrs<json> ?? %attrs<json>.first !! $name;
+    my $type = %attrs<gorm><type> || $gotype;
+    make Field.new(:$!idx, :$!parse-tag, :$ident, :$type, names=>%{ $.parse-tag => $name }, types=>%{ $.parse-tag => $gotype }, go-attrs=>%attrs)
+  }
   method tags ($/) { make $<subtag>.map({ .made }).Hash }
   method subtag ($/) {
     my $name = $<ident>.Str;
@@ -84,11 +122,29 @@ class Field {
   }
 }
 
-sub load_template($filename, Str:D :$lead_add='//+ ', Str:D :$lead_sub='//~ ') {
+sub load_template($filename, Str:D :$lead_str="//",
+  Str:D :$lead_add="$lead_str+ ", Str:D :$lead_sub="$lead_str~ ", Str:D :$lead_ignore="$lead_str- "
+) {
   my @subs;
+  my $ignore = Str;
   my $lines = gather for $filename.IO.lines {
     my $line = $_;
     my $line_trim = $line.trim;
+    if $ignore {
+      # say "'$ignore', '$line_trim'";
+      given $ignore {
+        when $line_trim { $ignore = Str }
+        when $lead_ignore.trim { $ignore = Str; proceed }
+        default {
+          take $lead_ignore ~ $line # TODO: ident?
+        }
+      }
+      next
+    }
+    if $line_trim.starts-with($lead_ignore) || $line_trim === $lead_ignore.trim {
+      $ignore = $line_trim;
+      next
+    }
     if $line_trim.starts-with($lead_sub) {
       (my $replace, my $to) = $line_trim.subst($lead_sub, :x(1)).split('=', 2).map({ .trim });
       @subs.push($replace => $to);
@@ -109,18 +165,29 @@ sub load_template($filename, Str:D :$lead_add='//+ ', Str:D :$lead_sub='//~ ') {
   $lines.join("\n")
 }
 
-sub load_model($filename) {
+sub load_model($filename, $parse-tag) {
   my @file_lines = $filename.IO.lines;
   # TODO: check if only one model and matches filename
-  my $struct_name = @file_lines.grep(/^type /).first.match(rx:s/type <(\w+)> struct/).Str;
-  my @field_lines = @file_lines.grep(/'`'gorm:/);
-  my @fields = @field_lines.map({field_grammar.parse($_, actions=>Field).made});
-  @fields = @fields.kv.map(-> $i, $v { $v.clone(idx=>$i) });
-  { struct_name => name_st($struct_name), :@fields }
-}
-
-sub name_st(Str:D $name) {
-  $name.subst(/ORM$/)
+  my @result;
+  my $struct_name = Str;
+  my @fields;
+  my $i = 0;
+  for @file_lines -> $line {
+    if $line.trim.starts-with('type ') {
+      $struct_name = $line.match(rx:s/type <(\w+)> struct/).Str;
+    }
+    if $line.contains('`gorm:'|'`protobuf:') {
+      @fields.push(field_grammar.parse($line, actions=>Parser.new(:idx($i++), :$parse-tag)).made)
+    }
+    if $line.trim.starts-with('}') {
+      if $struct_name {
+        @result.push(Table.new($struct_name, $parse-tag, @fields))
+      }
+      $struct_name = Str;
+      $i = 0;
+    }
+  }
+  @result
 }
 
 # get files in dao/model
@@ -130,18 +197,25 @@ my @model_files = $worksapce.add("dao/model").dir: test => { .ends-with(".gen.go
 my %models = @model_files.map({ .basename.subst(/'.'gen'.'go$/) }) Z=> @model_files;
 say "load models {%models.keys}";
 
-my @structs = %models.values.map({ load_model($_) }).sort({ $_<struct_name> });
-# say $struct_name, @fields;
-my $template = load_template($worksapce.add("protos/LL__template__TT.proto"));
+my @structs = %models.values.map({ load_model($_, "go_orm") }).flat.sort({ $_.name });
+
+# save proto
+my $proto_template = load_template($worksapce.add("templates/LL__db__TT.proto"));
 # say $template;
-my $proto = Template::Mustache.render($template, {
+my $proto = Template::Mustache.render($proto_template, {
   go_package => './dao/model',
   proto_package => 'square.db',
   :@structs,
 });
-
 my $out_proto = "protos/db.proto";
 $worksapce.add($out_proto).spurt($proto);
 say "run protoc $out_proto";
 run ("protoc", "--go_out=.", $worksapce.add($out_proto).Str), cwd=>$worksapce;
+
+# convert
+my @structs_pb = load_model($worksapce.add('dao/model/db.pb.go'), "go_proto").sort({ $_.name });
+# say (@structs Z, @structs_pb).map({{ |$_[0], fields_pb => $_[1]<fields> }});
+my $converter_template = load_template($worksapce.add("templates/LL__converter__TT.go"), lead_str=>'// ');
+# say $converter_template;
+
 run <go mod tidy>, cwd=>$worksapce;

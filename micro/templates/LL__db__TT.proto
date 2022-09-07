@@ -8,7 +8,8 @@ option go_package = "./go_package";
 
 //+ {{#structs}}
 
-message LL__struct_name__TT {
+// protobuf of {{ names.go_orm }}
+message LL__name__TT {
   //+ {{#fields}}
   //~ optional  = {{ optional-str }}
   //~ int32     = {{ rawtype }}
