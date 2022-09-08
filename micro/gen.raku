@@ -28,6 +28,26 @@ class Table {
     };
     self.bless(:$name, :%names, :@fields)
   }
+
+  method go_proto_name { %.names<go_proto> }
+  method go_orm_name { %.names<go_orm> }
+  method go_imports {
+    my $result = gather for @.fields -> $field {
+      take "google.golang.org/protobuf/types/known/timestamppb" if $field.types<go_proto>.contains("timestamppb.");
+    }
+    $result.flat.unique(:with(&[eq])).Seq
+  }
+
+  method push($b) {
+    if $.name ne $b.name {
+      say "table update: $.name != {$b.name}, ignore";
+      return
+    }
+    say "udpate $.name";
+    %!names = %( |$b.names, |%.names );
+    (@!fields Z, $b.fields).flat.map: -> $u, $v { $u.push($v) };
+    $(self)
+  }
 }
 
 class Field {
@@ -44,7 +64,64 @@ class Field {
     $!optional //= %!types<go_orm> ?? %!types<go_orm>.starts-with('*') !! Bool;
   }
 
-  method rawtype {
+  method name { $!ident }
+  method go_proto_name { %.names<go_proto> }
+  method go_orm_name { %.names<go_orm> }
+
+  method go_convert($from-name, $from-type, $to-name, $to-type, :$indent) {
+    my $src-expr = "m.{$from-name}";
+    my $dst-expr = "to.{$to-name}";
+    my $src-non-nil = "$src-expr != nil";
+    my $src-is-pointer = $from-type.starts-with("*");
+    my $dst-is-pointer = $to-type.starts-with("*");
+    my $src-type = $from-type.subst(/^\*/);
+    my $dst-type = $to-type.subst(/^\*/);
+    my $stmt = "";
+    my $comment = "";
+    if $src-type ne $dst-type {
+      $comment ~= "\n// transformer: $src-type => $dst-type";
+      if $src-type eq "timestamppb.Timestamp" && $dst-type eq "time.Time" {
+        $src-expr = "{$src-expr}.AsTime()";
+        $src-is-pointer = False;
+      } elsif $src-type eq "time.Time" && $dst-type eq "timestamppb.Timestamp" {
+        if $src-is-pointer {
+          $src-expr = "*$src-expr";
+        }
+        $src-expr = "timestamppb.New($src-expr)";
+        $src-is-pointer = True;
+      } else {
+        $comment ~= "  TODO: unimplemented";
+        say "unimplemented $src-type => $dst-type";
+      }
+    };
+    if !$src-is-pointer && $dst-is-pointer {
+      $src-expr = "&$src-expr";
+    } elsif $src-is-pointer && !$dst-is-pointer {
+      $src-expr = "*$src-expr";
+    }
+    $stmt ~= "$dst-expr = $src-expr";
+    if $src-is-pointer && !$dst-is-pointer {
+      $stmt = qq:to/CODE/
+      if $src-non-nil \{
+        $stmt
+      \}
+      CODE
+    }
+    my $result = qq:to/CODE/
+    {$comment.trim}
+    {$stmt.trim}
+    CODE
+    ;
+    $result.trim.lines.join("\n" ~ $indent)
+  }
+  method go_convert_to_orm($from-name = $.names<go_proto>, $from-type = $.types<go_proto>, $to-name = $.names<go_orm>, $to-type = $.types<go_orm>, :$indent="\t") {
+    $.go_convert($from-name, $from-type, $to-name, $to-type, :$indent)
+  }
+  method go_convert_to_pb($from-name = $.names<go_orm>, $from-type = $.types<go_orm>, $to-name = $.names<go_proto>, $to-type = $.types<go_proto>, :$indent="\t") {
+    $.go_convert($from-name, $from-type, $to-name, $to-type, :$indent)
+  }
+
+  method protobuf_type_from_go_orm {
     my $gotype = %!types<go_orm>.subst(/^\*/);
     if %protobuf_type_map{$gotype} {
       %protobuf_type_map{$gotype}
@@ -62,12 +139,16 @@ class Field {
       "required"
     }
   }
-  method name {
-    if %!go-attrs<json> {
-      %!go-attrs<json>.first
-    } else {
-      $.goname
+
+  method push($b) {
+    if $.name ne $b.name {
+      say "field update: $.name != {$b.name}, ignore";
+      return
     }
+    # say "update {self} to $b";
+    %!names = %( |$b.names, |%.names );
+    %!types = %( |$b.types, |%.types );
+    %!go-attrs = %( |$b.go-attrs, |%.go-attrs );
   }
 }
 grammar field_grammar {
@@ -100,7 +181,7 @@ class Parser {
     my $name = $<ident>.Str;
     given $name {
       when 'gorm' { make $name => self.gorm($<expr>) }
-      when 'json' { make $name => $<expr>.Str.split(',').list }
+      when 'json' | 'protobuf' { make $name => $<expr>.Str.split(',').list }
       default { make $name => $<expr>.Str }
     }
   }
@@ -127,8 +208,9 @@ sub load_template($filename, Str:D :$lead_str="//",
 ) {
   my @subs;
   my $ignore = Str;
+  my $ignore-indent;
   my $lines = gather for $filename.IO.lines {
-    my $line = $_;
+    my $line = $_.subst(/<<LL__(\w+)__TT>>/, {"\{\{ $0 \}\}"}, :g);
     my $line_trim = $line.trim;
     if $ignore {
       # say "'$ignore', '$line_trim'";
@@ -136,13 +218,14 @@ sub load_template($filename, Str:D :$lead_str="//",
         when $line_trim { $ignore = Str }
         when $lead_ignore.trim { $ignore = Str; proceed }
         default {
-          take $lead_ignore ~ $line # TODO: ident?
+          take $ignore-indent ~ $lead_ignore ~ $line.subst(/^$ignore-indent/)
         }
       }
       next
     }
     if $line_trim.starts-with($lead_ignore) || $line_trim === $lead_ignore.trim {
       $ignore = $line_trim;
+      $ignore-indent = $line.match(rx:s/^\s*/).Str;
       next
     }
     if $line_trim.starts-with($lead_sub) {
@@ -160,7 +243,7 @@ sub load_template($filename, Str:D :$lead_str="//",
       $line = S:g/<!ww><R><!ww>/%subs{$/}/ given $line;
       @subs := Array.new;
     }
-    take $line.subst(/<<LL__(\w+)__TT>>/, {"\{\{ $0 \}\}"}, :g);
+    take $line;
   }
   $lines.join("\n")
 }
@@ -181,7 +264,8 @@ sub load_model($filename, $parse-tag) {
     }
     if $line.trim.starts-with('}') {
       if $struct_name {
-        @result.push(Table.new($struct_name, $parse-tag, @fields))
+        @result.push(Table.new($struct_name, $parse-tag, @fields));
+        @fields = [];
       }
       $struct_name = Str;
       $i = 0;
@@ -202,7 +286,7 @@ my @structs = %models.values.map({ load_model($_, "go_orm") }).flat.sort({ $_.na
 # save proto
 my $proto_template = load_template($worksapce.add("templates/LL__db__TT.proto"));
 # say $template;
-my $proto = Template::Mustache.render($proto_template, {
+my $proto = Template::Mustache.render($proto_template, %{
   go_package => './dao/model',
   proto_package => 'square.db',
   :@structs,
@@ -214,8 +298,17 @@ run ("protoc", "--go_out=.", $worksapce.add($out_proto).Str), cwd=>$worksapce;
 
 # convert
 my @structs_pb = load_model($worksapce.add('dao/model/db.pb.go'), "go_proto").sort({ $_.name });
-# say (@structs Z, @structs_pb).map({{ |$_[0], fields_pb => $_[1]<fields> }});
+(@structs Z, @structs_pb).flat.map: -> $a, $b { $a.push($b) };
+my @converter_imports = @structs.map({ $_.go_imports }).flat.unique(:with(&[eq]));
+say @converter_imports;
+# say @structs;
 my $converter_template = load_template($worksapce.add("templates/LL__converter__TT.go"), lead_str=>'// ');
-# say $converter_template;
+my $converter_code = Template::Mustache.render($converter_template, %{
+  go_imports => @converter_imports,
+  go_package => 'model',
+  :@structs,
+});
+say $converter_code;
+$worksapce.add('dao/model/converter.gen.go').spurt($converter_code);
 
 run <go mod tidy>, cwd=>$worksapce;
