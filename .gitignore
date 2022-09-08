@@ -7,3 +7,4 @@ yarn-error.log
 postgres.log
 Cargo.lock
 *.bak
+go.work.sum
