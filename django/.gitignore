@@ -1,3 +1,7 @@
 __pycache__
-db.sqlite3
+*.sqlite3
 *-journal
+*_gen.py
+*_pb2.py
+/src/migrations/*
+!/src/migrations/__init__.py

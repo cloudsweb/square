@@ -294,7 +294,7 @@ my $proto = Template::Mustache.render($proto_template, %{
 my $out_proto = "protos/db.proto";
 $worksapce.add($out_proto).spurt($proto);
 say "run protoc $out_proto";
-run ("protoc", "--go_out=.", $worksapce.add($out_proto).Str), cwd=>$worksapce;
+run ("protoc", "--go_out=.", $out_proto), cwd=>$worksapce;
 
 # convert
 my @structs_pb = load_model($worksapce.add('dao/model/db.pb.go'), "go_proto").sort({ $_.name });

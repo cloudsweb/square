@@ -1,12 +1,15 @@
 {
   "scripts": {
-    "dbcreate": "pg_ctl -D data init",
-    "dbstart": "pg_ctl -D data -o '-p7039' -l postgres.log start",
+    "dbcreate": "pg_ctl init -D data && yarn dbstart && yarn diesel setup && yarn dbstop",
+    "dbstart": "pg_ctl start -D data -o '-p7039' -l postgres.log",
     "dbshell": "psql -p7039 posts",
-    "dbstop": "pg_ctl -D data stop",
+    "dbstop": "pg_ctl stop -D data",
+    "__dbreset__": "echo 'about to RESET db?' && read i && (yarn dbstop; echo) && rm -rf data && yarn dbcreate && yarn dbstart",
     "diesel": "diesel --database-url postgresql://localhost:7039/posts",
     "dev-build": "cargo watch -w server --why -x build",
     "dev-run": "RUST_BACKTRACE=1 cargo watch -w target/debug/square-core -w .env --ignore-nothing --poll -s target/debug/square-core",
+    "django": "python django/manage.py",
+    "dev-rest": "python django/manage.py runserver",
     "web": "yarn --cwd web",
     "dev-web": "yarn --cwd web dev"
   }

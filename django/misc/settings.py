@@ -37,6 +37,7 @@ INSTALLED_APPS = [
   'django.contrib.sessions',
   'django.contrib.messages',
   'django.contrib.staticfiles',
+  'src',
 ]
 
 MIDDLEWARE = [
@@ -76,10 +77,15 @@ WSGI_APPLICATION = 'misc.wsgi.application'
 DATABASES = {
   'default': {
     'ENGINE': 'django.db.backends.sqlite3',
-    'NAME': BASE_DIR / 'db.sqlite3',
-  }
+    'NAME': BASE_DIR / 'test.sqlite3',
+  },
 }
 
+DATABASE_MAIN = 'default'
+
+DATABASE_ROUTERS = [
+  "src.models.Router",
+]
 
 # Password validation
 # https://docs.djangoproject.com/en/4.0/ref/settings/#auth-password-validators
