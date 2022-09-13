@@ -48,6 +48,7 @@ MIDDLEWARE = [
   'django.contrib.auth.middleware.AuthenticationMiddleware',
   'django.contrib.messages.middleware.MessageMiddleware',
   'django.middleware.clickjacking.XFrameOptionsMiddleware',
+  'misc.middleware.JsonMiddleware',
 ]
 
 ROOT_URLCONF = 'misc.urls'
@@ -105,6 +106,7 @@ AUTH_PASSWORD_VALIDATORS = [
   },
 ]
 
+AUTHENTICATION_BACKENDS = [ "src.admin.AuthBackend" ]
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/

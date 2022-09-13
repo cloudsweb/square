@@ -10,7 +10,11 @@ my $model-py = run(<python manage.py inspectdb --settings=misc.prod --database=d
 $model-py = $model-py
   .subst("managed = False", "managed = True", :g)
   .subst(rx:s/class DieselSchemaMigrations.*\'__diesel_schema_migrations\'\n\n\n/)
-  .subst(rx:s/class DjangoMigrations.*\'django_migrations\'\n\n\n/);
+  .subst(rx:s/class DjangoMigrations.*\'django_migrations\'\n\n\n/)
+  .subst("inserted_at = models.DateTimeField()", "inserted_at = models.DateTimeField(auto_now_add=True)", :g)
+  .subst("updated_at = models.DateTimeField()", "updated_at = models.DateTimeField(auto_now=True)", :g)
+  .subst("models.BigIntegerField(primary_key=True)", "models.BigAutoField(primary_key=True)", :g);
+
 $worksapce.add('src/models_gen.py').spurt($model-py);
 
 run <python manage.py makemigrations>, cwd=>$worksapce;
@@ -30,3 +34,5 @@ run <protoc -I../micro --python_out=. protos/db.proto>, cwd=>$worksapce;
   say "$prompt:";
   run(@cmd, cwd=>$worksapce, :out).out.slurp(:close).lines.grep(/^class/).join("\n").subst("class ", "  ", :g).subst("(models.Model):", :g).say;
 }
+run <python manage.py loaddata fixtures.yaml>, cwd=>$worksapce;
+run <python manage.py dumpdata main --format yaml>, cwd=>$worksapce;
