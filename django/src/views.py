@@ -2,10 +2,11 @@
 from django.http import HttpRequest, HttpResponse
 # functions
 from misc.middleware import ObjectResponse
+from .admin import login_required
 from django.contrib.auth import authenticate, login
 from django.views.generic.base import View
 # decorators
-from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 
 # Create your views here.
@@ -19,12 +20,14 @@ def signin(request: HttpRequest):
   user = authenticate(request, username=username, password=password)
   if user is not None:
     login(request, user)
+    return ObjectResponse("success")
+  return ObjectResponse("failed", status=403)
 
 class PostView(View):
 
-  @login_required
-  def post(request: HttpRequest):
+  @method_decorator(login_required)
+  def post(request: HttpRequest, *_, id: str):
     return ObjectResponse("method not supported", status=405)
 
-  def get(request: HttpRequest):
-    return ObjectResponse("show post")
+  def get(request: HttpRequest, *_, id: str):
+    return ObjectResponse(f"show post <{id}>")
