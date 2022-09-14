@@ -18,8 +18,8 @@ def index(request: HttpRequest):
 
 @require_POST
 def signin(request: HttpRequest):
-  username = request.POST.get('username', None) or request.POST.get('alias', None)
-  password = request.POST.get('password', None)
+  username = request.data.get('username', None) or request.data.get('alias', None)
+  password = request.data.get('password', None)
   user = authenticate(request, username=username, password=password)
   if user is not None:
     login(request, user)
@@ -32,8 +32,8 @@ class PostView(View):
   @staticmethod
   def _post(request: HttpRequest):
     user: Users = request.user._user
-    title = request.POST.get('title', None)
-    content = request.POST.get('content', None)
+    title = request.data.get('title', None)
+    content = request.data.get('content', None)
     post = Posts._default_manager.create(
       id=uuid.uuid4().hex,
       topic_id=0,
@@ -61,8 +61,8 @@ class PostView(View):
     if content is not None:
       post.content = content
       columns.append('content')
-    post.save(columns=columns)
-    return ObjectResponse({ "msg": "updated", "id": post.id }, status=200)
+    post.save(update_fields=columns)
+    return ObjectResponse({ "msg": "updated", "id": post.id.hex }, status=200)
 
   def get(self, request: HttpRequest, *_, id: str):
     try:

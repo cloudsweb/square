@@ -49,6 +49,19 @@ class Test(TestCase):
     self.assertEqual(resp.status_code, 200)
     post_id = resp.json()['data']['id']
     logging.info(f"post created {post_id}")
+    self.assertJSONEqual(resp.content, {'code': 200, 'data': {'msg': 'created', 'id': post_id}})
 
     resp = self.c.get(f"/post/{post_id}")
-    self.assertEqual(resp.json()['data']['pk'].replace('-', ''), post_id.replace('-', ''))
+    data = resp.json()['data']
+    self.assertEqual(data['pk'].replace('-', ''), post_id.replace('-', ''))
+    self.assertEqual(data['fields']['title'], 'greet')
+    self.assertEqual(data['fields']['content'], 'hello world')
+
+    resp = self.c.put(f"/post/{post_id}", data={"content": "hello new world"})
+    self.assertJSONEqual(resp.content, {'code': 200, 'data': {'msg': 'updated', 'id': post_id}})
+
+    resp = self.c.get(f"/post/{post_id}")
+    data = resp.json()['data']
+    self.assertEqual(data['pk'].replace('-', ''), post_id.replace('-', ''))
+    self.assertEqual(data['fields']['title'], 'greet')
+    self.assertEqual(data['fields']['content'], 'hello new world')

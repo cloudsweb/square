@@ -70,14 +70,9 @@ class JsonMiddleware(MiddlewareMixin):
       if not data:
         return
 
-      if request.method == 'GET':
-        if not request.GET._mutable:
-          request.GET = QueryDict(mutable=True)
-        request.GET.update(data)
+      request.data = data
 
-      if request.method == 'POST':
-        if not request.POST._mutable:
-          request.POST = QueryDict(mutable=True)
+      if request.method == 'POST' and request.POST._mutable:
         request.POST.update(data)
 
   """
