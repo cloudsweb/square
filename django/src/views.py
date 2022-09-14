@@ -2,7 +2,7 @@
 import uuid
 from django.http import HttpRequest, HttpResponse
 # functions
-from misc.middleware import ObjectResponse
+from misc.middleware import ObjectResponse, HttpResponseUnauthorized
 from .admin import login_required
 from django.contrib.auth import authenticate, login
 from django.views.generic.base import View
@@ -24,7 +24,7 @@ def signin(request: HttpRequest):
   if user is not None:
     login(request, user)
     return ObjectResponse("success")
-  return ObjectResponse("failed", status=403)
+  return HttpResponseUnauthorized("login failed")
 
 class PostView(View):
 

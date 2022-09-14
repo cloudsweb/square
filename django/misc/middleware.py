@@ -1,23 +1,36 @@
 from io import StringIO
-# import logging
+import logging
 import json
-# from django.core.serializers.json import DjangoJSONEncoder, Deserializer
 from django.http.request import QueryDict, HttpRequest
-from django.http.response import HttpResponse, HttpResponseBase, JsonResponse
+from django.http.response import HttpResponse
+# from django.core import exceptions
 from django.utils.deprecation import MiddlewareMixin
 from django.db.models import Model
 from django.core.serializers import get_serializer
 
+logger = logging.getLogger("misc.middleware")
+
+object_types = {
+  'application/json': 'json',
+  'application/yaml': 'yaml',
+  'application/xml': 'xml',
+}
+
+class LoginRequired(Exception):
+    """The operator requires login"""
+    pass
+
+class HttpResponseUnauthorized(HttpResponse):
+  status_code = 401
+
 class ObjectResponse(HttpResponse):
   def __init__(self, obj, *args, **kwargs) -> None:
     # TODO check if dict
-    # logging.info(f"{type(obj)} => {obj}")
+    # logger.debug(f"{type(obj)} => {obj}")
 
     if isinstance(obj, Model):
       content = self.serialize_single('json', obj)
     else:
-      if not isinstance(obj, dict):
-        obj = { 'data': obj }
       content = json.dumps(obj)
     super().__init__(content, *args, content_type='text/plain', **kwargs)
     self.item = obj
@@ -36,7 +49,10 @@ class ObjectResponse(HttpResponse):
     return serializer.serialize([obj], **kwargs)
 
   def as_type(self, type):
+    # if type in object_types:
+    #   serialize_type = object_types[type]
     if type == "application/json":
+      self.content = f'{{"code":{json.dumps(self.status_code)}, "data":{self.content.decode(self.charset)}}}'
       self.headers["Content-Type"] = type
 
 class JsonMiddleware(MiddlewareMixin):
@@ -70,7 +86,7 @@ class JsonMiddleware(MiddlewareMixin):
   def process_response(self, request: HttpRequest, response: HttpResponse):
     content_type = request.META.get('CONTENT_TYPE')
     if content_type and 'application/json' in content_type:
-      # logging.info(f"{content_type} => {response}")
+      # logger.info(f"{content_type} => {response}")
       if isinstance(response, ObjectResponse): # TODO: payload?
         response.as_type("application/json")
       elif isinstance(response, HttpResponse):
@@ -78,3 +94,10 @@ class JsonMiddleware(MiddlewareMixin):
         response.headers["Content-Type"] = "application/json"
 
     return response
+
+  def process_exception(self, request: HttpRequest, exception: Exception):
+    # TODO: separate middleware ExceptionMessageMiddleware
+    if isinstance(exception, LoginRequired):
+      return HttpResponseUnauthorized("login required") # this would auto forward to process_response
+    else:
+      logger.warn(f"unhandled exception: {type(exception)}")

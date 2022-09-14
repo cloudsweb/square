@@ -6,7 +6,7 @@ from .models_gen import Users, Secrets
 
 from typing import Optional
 import functools
-from django.core.exceptions import PermissionDenied
+from misc.middleware import LoginRequired
 from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth.models import User
 
@@ -14,7 +14,7 @@ def login_required(f):
   @functools.wraps(f)
   def wrapped(request, *args, **kwargs):
     if not request.user.is_authenticated:
-      raise PermissionDenied
+      raise LoginRequired
     return f(request, *args, **kwargs)
   return wrapped
 
