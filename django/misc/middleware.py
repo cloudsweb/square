@@ -1,20 +1,43 @@
+from io import StringIO
+# import logging
 import json
 # from django.core.serializers.json import DjangoJSONEncoder, Deserializer
 from django.http.request import QueryDict, HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase, JsonResponse
 from django.utils.deprecation import MiddlewareMixin
+from django.db.models import Model
+from django.core.serializers import get_serializer
 
 class ObjectResponse(HttpResponse):
   def __init__(self, obj, *args, **kwargs) -> None:
     # TODO check if dict
-    if not isinstance(obj, dict):
-      obj = { 'data': obj }
-    super().__init__(json.dumps(obj), *args, **kwargs)
+    # logging.info(f"{type(obj)} => {obj}")
+
+    if isinstance(obj, Model):
+      content = self.serialize_single('json', obj)
+    else:
+      if not isinstance(obj, dict):
+        obj = { 'data': obj }
+      content = json.dumps(obj)
+    super().__init__(content, *args, content_type='text/plain', **kwargs)
     self.item = obj
+
+  def serialize_single(self, format, obj, **kwargs):
+    serializer = get_serializer(format)()
+    def wrap(s, func):
+      def wrapped(*args, **kwargs):
+        s.stream, old_stream = StringIO(), s.stream
+        result = func(*args, **kwargs)
+        s.stream = old_stream
+        return result
+      return wrapped
+    serializer.start_serialization = wrap(serializer, serializer.start_serialization)
+    serializer.end_serialization = wrap(serializer, serializer.end_serialization)
+    return serializer.serialize([obj], **kwargs)
 
   def as_type(self, type):
     if type == "application/json":
-      self.headers.setdefault("Content-Type", type)
+      self.headers["Content-Type"] = type
 
 class JsonMiddleware(MiddlewareMixin):
   """
@@ -47,10 +70,11 @@ class JsonMiddleware(MiddlewareMixin):
   def process_response(self, request: HttpRequest, response: HttpResponse):
     content_type = request.META.get('CONTENT_TYPE')
     if content_type and 'application/json' in content_type:
+      # logging.info(f"{content_type} => {response}")
       if isinstance(response, ObjectResponse): # TODO: payload?
         response.as_type("application/json")
       elif isinstance(response, HttpResponse):
-        response.content = json.dumps({ 'data': response.content.decode('utf8') })
-        response.headers.setdefault("Content-Type", "application/json")
+        response.content = json.dumps({ 'msg': response.content.decode('utf8'), 'code': response.status_code })
+        response.headers["Content-Type"] = "application/json"
 
     return response

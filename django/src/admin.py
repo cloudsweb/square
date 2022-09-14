@@ -38,6 +38,7 @@ class AuthBackend(BaseBackend):
     #     "password": password
     #   })
     auth_user, _ = User._default_manager.get_or_create(username=f"@{user.id}")
+    auth_user._user = user
     auth_user.email = f"{user.alias}@main"
     auth_user.first_name = user.name
     auth_user.password = password
